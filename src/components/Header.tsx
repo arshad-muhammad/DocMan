@@ -1,0 +1,17 @@
+import { FileText } from 'lucide-react';
+
+export default function Header() {
+  return (
+    <header className="bg-white border-b border-gray-200 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center space-x-3">
+        <div className="bg-black p-2 rounded-lg text-white">
+          <FileText size={20} />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-black">Sphere Hive Document Archive</h1>
+          <p className="text-xs text-gray-500">Official document management, indexing & archive</p>
+        </div>
+      </div>
+    </header>
+  );
+}

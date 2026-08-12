@@ -9,9 +9,17 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.7.1",
+    "cloudinary": "^2.10.0",
+    "date-fns": "^4.4.0",
+    "docx-preview": "^0.4.0",
+    "lucide-react": "^1.31.0",
+    "mysql2": "^3.23.3",
     "next": "16.3.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "react-hook-form": "^7.85.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
