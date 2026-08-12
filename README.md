@@ -1,6 +1,6 @@
 # Sphere Hive Document Archive
 
-A complete, production-ready Document Management Web Application for internal document archiving. Users can upload, manage, search, preview, download, edit, and delete official club documents.
+A complete, production-ready Document Management  Application for internal document archiving. Users can upload, manage, search, preview, download, edit, and delete official club documents.
 
 ## 1. Project Setup
 This project is built with Next.js (App Router), TypeScript, and Tailwind CSS. It uses MySQL for database storage and Cloudinary for file hosting.
