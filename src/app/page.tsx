@@ -9,7 +9,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#F7F9FC]">
-      <Header />
+      {/* <Header /> */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6 flex space-x-2 border-b border-gray-200">
           <button
