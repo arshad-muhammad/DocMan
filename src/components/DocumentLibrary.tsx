@@ -81,7 +81,7 @@ export default function DocumentLibrary() {
       </div>
 
       {/* Filters Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200 text-black">
         <form onSubmit={handleSearchSubmit} className="flex-1 flex items-center relative">
           <Search className="absolute left-3 text-gray-400" size={18} />
           <input
