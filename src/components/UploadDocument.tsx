@@ -94,7 +94,18 @@ export default function UploadDocument({ onSuccess }: UploadDocumentProps) {
         body: formData,
       });
 
-      const data = await res.json();
+      let data;
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        if (!res.ok) {
+          throw new Error(`Server error: ${res.status} ${res.statusText}. ${text.substring(0, 100)}`);
+        }
+        data = {};
+      }
+
       if (!res.ok) throw new Error(data.error || 'Failed to upload document');
 
       setSuccessData({ referenceNumber: data.referenceNumber });
