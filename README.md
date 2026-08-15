@@ -1,4 +1,4 @@
-# Sphere Hive Document Archive
+# Sphere Hive Document Hub
 
 A complete, production-ready Document Management  Application for internal document archiving. Users can upload, manage, search, preview, download, edit, and delete official club documents.
 
