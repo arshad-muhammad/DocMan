@@ -40,7 +40,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       return NextResponse.json({ error: 'Confirmation string does not match the reference number exactly' }, { status: 400 });
     }
 
-    // Delete all historical versions from Cloudinary
+    // Delete all historical versions (this table might still use the old column name but we will query it)
     const [versionRows] = await pool.query<RowDataPacket[]>('SELECT cloudinary_public_id, file_type FROM imp_doc_versions WHERE document_id = ?', [doc.id]);
     for (const v of versionRows) {
       try { await deleteFromSupabase(v.cloudinary_public_id); } catch (e) { console.error('Failed to clean up versioned file', e); }
@@ -96,8 +96,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const basePdfName = doc.pdf_filename.replace(/(__\d+)?\.pdf$/i, '');
         const baseDocxName = doc.docx_filename.replace(/(__\d+)?\.docx$/i, '');
         
-        newPdfFilename = `${basePdfName}__${newPdfVersion.toString().padStart(4, '0')}.pdf`;
-        newDocxFilename = `${baseDocxName}__${newDocxVersion.toString().padStart(4, '0')}.docx`;
+        newPdfFilename = `${basePdfName}__${newPdfVersion.toString().padStart(3, '0')}.pdf`;
+        newDocxFilename = `${baseDocxName}__${newDocxVersion.toString().padStart(3, '0')}.docx`;
 
         newPdfUrl = pdfUrl;
         newPdfPublicId = pdfPublicId;
@@ -107,14 +107,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
       const updateQuery = `
         UPDATE imp_doc SET 
-          title = ?, description = ?, category = ?, signatory = ?, recipient = ?, 
+          title = ?, description = ?, signatory = ?, 
           issued_date = ?, tags = ?, 
           pdf_url = ?, pdf_public_id = ?, pdf_filename = ?, pdf_version = ?,
           docx_url = ?, docx_public_id = ?, docx_filename = ?, docx_version = ?
         WHERE id = ?
       `;
       const updateParams = [
-        title || doc.title, description, doc.category, signatory, doc.recipient, 
+        title || doc.title, description, signatory, 
         issuedDate || doc.issued_date, tags, 
         newPdfUrl, newPdfPublicId, newPdfFilename, newPdfVersion,
         newDocxUrl, newDocxPublicId, newDocxFilename, newDocxVersion,
@@ -147,7 +147,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const year = new Date(doc.issued_date).getFullYear().toString();
     const orgFolder = doc.organization.toLowerCase();
-    const cloudinaryFolder = `document-management/${orgFolder}/${year}/${doc.reference_number}`;
+    const storageFolder = `document-management/${orgFolder}/${year}/${doc.reference_number}`;
 
     if (pdfFile || docxFile) {
       if (!pdfFile || !docxFile || typeof pdfFile === 'string' || typeof docxFile === 'string') {
@@ -170,21 +170,21 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       const basePdfName = doc.pdf_filename.replace(/(__\d+)?\.pdf$/i, '');
       const baseDocxName = doc.docx_filename.replace(/(__\d+)?\.docx$/i, '');
       
-      newPdfFilename = `${basePdfName}__${newPdfVersion.toString().padStart(4, '0')}.pdf`;
-      newDocxFilename = `${baseDocxName}__${newDocxVersion.toString().padStart(4, '0')}.docx`;
+      newPdfFilename = `${basePdfName}__${newPdfVersion.toString().padStart(3, '0')}.pdf`;
+      newDocxFilename = `${baseDocxName}__${newDocxVersion.toString().padStart(3, '0')}.docx`;
 
-      const pdfResult = await uploadToSupabase(pdfBuffer, cloudinaryFolder, newPdfFilename, pdfFile.type);
+      const pdfResult = await uploadToSupabase(pdfBuffer, storageFolder, newPdfFilename, pdfFile.type);
       newPdfUrl = pdfResult.url;
       newPdfPublicId = pdfResult.public_id;
       
-      const docxResult = await uploadToSupabase(docxBuffer, cloudinaryFolder, newDocxFilename, docxFile.type);
+      const docxResult = await uploadToSupabase(docxBuffer, storageFolder, newDocxFilename, docxFile.type);
       newDocxUrl = docxResult.url;
       newDocxPublicId = docxResult.public_id;
     }
 
     const updateQuery = `
       UPDATE imp_doc SET 
-        title = ?, description = ?, category = ?, signatory = ?, recipient = ?, 
+        title = ?, description = ?, signatory = ?, 
         issued_date = ?, tags = ?, 
         pdf_url = ?, pdf_public_id = ?, pdf_filename = ?, pdf_version = ?,
         docx_url = ?, docx_public_id = ?, docx_filename = ?, docx_version = ?
@@ -193,9 +193,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const updateParams = [
       title || doc.title, 
       description, 
-      doc.category, 
       signatory, 
-      doc.recipient, 
       issuedDate || doc.issued_date, 
       tags, 
       newPdfUrl, 

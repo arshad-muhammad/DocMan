@@ -51,11 +51,7 @@ export default function DocumentLibrary() {
   };
 
   const getDownloadUrl = (url: string, filename: string) => {
-    if (!url) return '';
-    if (url.includes('cloudinary.com')) {
-      return `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename || 'document')}`;
-    }
-    return `${url}?download=${encodeURIComponent(filename || 'document')}`;
+    return `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
   };
 
   const currentYear = new Date().getFullYear().toString();

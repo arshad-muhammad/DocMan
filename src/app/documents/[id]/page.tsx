@@ -68,12 +68,7 @@ export default function DocumentDetails() {
 
   const getDownloadUrl = (url: string, filename: string) => {
     if (!url) return '';
-    // If it's still an old Cloudinary URL, use the proxy
-    if (url.includes('cloudinary.com')) {
-      return `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename || 'document')}`;
-    }
-    // For Supabase, append download parameter
-    return `${url}?download=${encodeURIComponent(filename || 'document')}`;
+    return `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename || 'document')}`;
   };
 
   return (
@@ -169,9 +164,9 @@ export default function DocumentDetails() {
                 <div className="w-full h-full flex-1 rounded-lg overflow-hidden border border-gray-200 bg-white">
                   {document.pdf_url ? (
                     <iframe 
-                      src={document.pdf_url.includes('cloudinary.com') ? `/api/view?url=${encodeURIComponent(document.pdf_url)}#toolbar=0` : `${document.pdf_url}#toolbar=0`} 
-                      className="w-full h-full" 
-                      title="PDF Preview"
+                      src={`${document.pdf_url}#toolbar=0`} 
+                      className="w-full h-full rounded-b-xl border-none bg-slate-100"
+                      title={document.title}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-500">

@@ -20,11 +20,10 @@ export async function GET(req: NextRequest) {
         title LIKE ? OR 
         description LIKE ? OR 
         signatory LIKE ? OR 
-        recipient LIKE ? OR 
         tags LIKE ?
       )`;
       const searchWildcard = `%${search}%`;
-      params.push(searchWildcard, searchWildcard, searchWildcard, searchWildcard, searchWildcard, searchWildcard);
+      params.push(searchWildcard, searchWildcard, searchWildcard, searchWildcard, searchWildcard);
     }
 
     if (organization && organization !== 'All') {
@@ -70,15 +69,15 @@ export async function POST(req: NextRequest) {
 
       const query = `
         INSERT INTO imp_doc (
-          reference_number, organization, category, title, description,
-          signatory, recipient, issued_date, tags,
+          reference_number, organization, title, description,
+          signatory, issued_date, tags,
           pdf_filename, pdf_url, pdf_public_id,
           docx_filename, docx_url, docx_public_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const params = [
-        referenceNumber, organization, 'NONE', title, description || '',
-        signatory || '', '', issuedDate, tags || '',
+        referenceNumber, organization, title, description || '',
+        signatory || '', issuedDate, tags || '',
         pdfFilename, pdfUrl, pdfPublicId,
         docxFilename, docxUrl, docxPublicId
       ];
@@ -119,22 +118,22 @@ export async function POST(req: NextRequest) {
     const referenceNumber = await generateReferenceNumber(orgCode, year);
 
     const baseFilename = referenceNumber;
-    const pdfFilename = `${baseFilename}__0001.pdf`;
-    const docxFilename = `${baseFilename}__0001.docx`;
+    const pdfFilename = `${baseFilename}__001.pdf`;
+    const docxFilename = `${baseFilename}__001.docx`;
 
     // Folder structure: document-management/<org>/<year>/<reference>
     const orgFolder = organization.toLowerCase();
-    const cloudinaryFolder = `document-management/${orgFolder}/${year}/${referenceNumber}`;
+    const storageFolder = `document-management/${orgFolder}/${year}/${referenceNumber}`;
 
     // Convert File to Buffer
     const pdfBuffer = Buffer.from(await pdfFile.arrayBuffer());
     const docxBuffer = Buffer.from(await docxFile.arrayBuffer());
 
     // Upload to Supabase
-    pdfResult = await uploadToSupabase(pdfBuffer, cloudinaryFolder, pdfFilename, pdfFile.type);
+    pdfResult = await uploadToSupabase(pdfBuffer, storageFolder, pdfFilename, pdfFile.type);
     
     try {
-      docxResult = await uploadToSupabase(docxBuffer, cloudinaryFolder, docxFilename, docxFile.type);
+      docxResult = await uploadToSupabase(docxBuffer, storageFolder, docxFilename, docxFile.type);
     } catch (docxErr) {
       // If DOCX fails, clean up PDF
       if (pdfResult) await deleteFromSupabase(pdfResult.public_id);
@@ -144,15 +143,15 @@ export async function POST(req: NextRequest) {
     // Save to DB
     const query = `
       INSERT INTO imp_doc (
-        reference_number, organization, category, title, description,
-        signatory, recipient, issued_date, tags,
+        reference_number, organization, title, description,
+        signatory, issued_date, tags,
         pdf_filename, pdf_url, pdf_public_id,
         docx_filename, docx_url, docx_public_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const params = [
-      referenceNumber, organization, 'NONE', title, description,
-      signatory, '', issuedDate, tags,
+      referenceNumber, organization, title, description,
+      signatory, issuedDate, tags,
       pdfFilename, pdfResult.url, pdfResult.public_id,
       docxFilename, docxResult.url, docxResult.public_id
     ];
