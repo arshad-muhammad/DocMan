@@ -97,6 +97,15 @@ export default function UploadDocument({ onSuccess }: UploadDocumentProps) {
         body: formData,
       });
 
+      const contentType = dbRes.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textError = await dbRes.text();
+        if (dbRes.status === 413) {
+          throw new Error("File is too large. Maximum upload size exceeded.");
+        }
+        throw new Error(textError || 'Server error: Invalid response format');
+      }
+
       const data = await dbRes.json();
       if (!dbRes.ok) throw new Error(data.error || 'Failed to save document record');
 
