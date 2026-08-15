@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Search, Filter, Loader2, FileText, File as FileIcon, Eye, Trash2, Edit } from 'lucide-react';
+import { Search, Filter, Loader2, FileText, File as FileIcon, Eye, Trash2, Edit, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import DeleteDocumentModal from './DeleteDocumentModal';
@@ -48,6 +48,10 @@ export default function DocumentLibrary() {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     fetchDocuments();
+  };
+
+  const getDownloadUrl = (url: string, filename: string) => {
+    return `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
   };
 
   const currentYear = new Date().getFullYear().toString();
@@ -138,13 +142,13 @@ export default function DocumentLibrary() {
                   <td className="py-3 px-4 font-medium text-slate-800 max-w-xs truncate" title={doc.title}>{doc.title}</td>
                   <td className="py-3 px-4 text-slate-600">{format(new Date(doc.issued_date), 'dd MMM yyyy')}</td>
                   <td className="py-3 px-4 text-right space-x-2">
-                    <Link href={`/documents/${doc.reference_number}`} className="inline-flex items-center justify-center p-2 bg-gray-100 text-black rounded-md hover:bg-gray-200 transition-colors">
+                    <Link href={`/documents/${doc.reference_number}`} className="inline-flex items-center justify-center p-2 bg-gray-100 text-black rounded-md hover:bg-gray-200 transition-colors" title="Preview">
                       <Eye size={16} />
                     </Link>
-                    <a href={doc.pdf_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center p-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors">
+                    <a href={getDownloadUrl(doc.pdf_url, doc.pdf_filename)} download className="inline-flex items-center justify-center p-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors" title="Download PDF">
                       <FileText size={16} />
                     </a>
-                    <a href={doc.docx_url} download className="inline-flex items-center justify-center p-2 bg-gray-100 text-black rounded-md hover:bg-gray-200 transition-colors" title="Download DOCX">
+                    <a href={getDownloadUrl(doc.docx_url, doc.docx_filename)} download className="inline-flex items-center justify-center p-2 bg-gray-100 text-black rounded-md hover:bg-gray-200 transition-colors" title="Download DOCX">
                       <FileIcon size={16} />
                     </a>
                     <button 
@@ -157,6 +161,7 @@ export default function DocumentLibrary() {
                     <button 
                       onClick={() => { setDocToDelete(doc); setDeleteModalOpen(true); }}
                       className="inline-flex items-center justify-center p-2 bg-rose-50 text-rose-600 rounded-md hover:bg-rose-100 transition-colors"
+                      title="Delete Document"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -183,10 +188,10 @@ export default function DocumentLibrary() {
                     Preview
                   </Link>
                   <div className="flex space-x-2">
-                    <a href={doc.pdf_url} target="_blank" rel="noopener noreferrer" className="p-2 bg-red-50 text-red-600 rounded-md"><FileText size={16} /></a>
-                    <a href={doc.docx_url} download className="p-2 bg-gray-100 text-black rounded-md"><FileIcon size={16} /></a>
-                    <button onClick={() => { setDocToEdit(doc); setEditModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded-md"><Edit size={16} /></button>
-                    <button onClick={() => { setDocToDelete(doc); setDeleteModalOpen(true); }} className="p-2 bg-rose-50 text-rose-600 rounded-md"><Trash2 size={16} /></button>
+                    <a href={getDownloadUrl(doc.pdf_url, doc.pdf_filename)} download className="p-2 bg-red-50 text-red-600 rounded-md" title="Download PDF"><FileText size={16} /></a>
+                    <a href={getDownloadUrl(doc.docx_url, doc.docx_filename)} download className="p-2 bg-gray-100 text-black rounded-md" title="Download DOCX"><FileIcon size={16} /></a>
+                    <button onClick={() => { setDocToEdit(doc); setEditModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded-md" title="Edit"><Edit size={16} /></button>
+                    <button onClick={() => { setDocToDelete(doc); setDeleteModalOpen(true); }} className="p-2 bg-rose-50 text-rose-600 rounded-md" title="Delete"><Trash2 size={16} /></button>
                   </div>
                 </div>
               </div>

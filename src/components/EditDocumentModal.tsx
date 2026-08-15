@@ -24,6 +24,8 @@ export default function EditDocumentModal({ document, onClose, onSuccess }: Edit
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
 
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (title.length < 3) return setError('Title must be at least 3 characters.');
@@ -50,8 +52,10 @@ export default function EditDocumentModal({ document, onClose, onSuccess }: Edit
       formData.append('issuedDate', issuedDate);
       formData.append('tags', tags);
       
-      if (pdfFile) formData.append('pdf', pdfFile);
-      if (docxFile) formData.append('docx', docxFile);
+      if (pdfFile && docxFile) {
+        formData.append('pdf', pdfFile);
+        formData.append('docx', docxFile);
+      }
 
       const res = await fetch(`/api/documents/${document.reference_number}`, {
         method: 'PUT',

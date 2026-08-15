@@ -6,7 +6,7 @@ import Link from 'next/link';
 import DOCXViewer from '@/components/DOCXViewer';
 import EditDocumentModal from '@/components/EditDocumentModal';
 import DeleteDocumentModal from '@/components/DeleteDocumentModal';
-import Header from '@/components/Header';
+// import Header from '@/components/Header';
 import { format } from 'date-fns';
 
 export default function DocumentDetails() {
@@ -19,6 +19,7 @@ export default function DocumentDetails() {
   
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [previewType, setPreviewType] = useState<'pdf' | 'docx'>('pdf');
 
   const fetchDocument = async () => {
     setLoading(true);
@@ -41,7 +42,7 @@ export default function DocumentDetails() {
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex flex-col">
-        <Header />
+        {/* <Header /> */}
         <div className="flex-1 flex justify-center items-center text-black">
           <Loader2 className="animate-spin" size={40} />
         </div>
@@ -52,7 +53,7 @@ export default function DocumentDetails() {
   if (error || !document) {
     return (
       <div className="min-h-screen bg-white flex flex-col">
-        <Header />
+        {/* <Header /> */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
           <Link href="/" className="inline-flex items-center text-gray-500 hover:text-black mb-6 font-medium text-sm transition-colors">
             <ArrowLeft size={16} className="mr-2" /> Back to Document Library
@@ -65,9 +66,14 @@ export default function DocumentDetails() {
     );
   }
 
+  const getDownloadUrl = (url: string, filename: string) => {
+    if (!url) return '';
+    return `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename || 'document')}`;
+  };
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <Header />
+      {/* <Header /> */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <Link href="/" className="inline-flex items-center text-gray-500 hover:text-black mb-6 font-medium text-sm transition-colors">
           <ArrowLeft size={16} className="mr-2" /> Back to Document Library
@@ -110,12 +116,16 @@ export default function DocumentDetails() {
             </div>
 
             <div className="mt-8 space-y-3 pt-6 border-t border-gray-200">
-              <a href={document.pdf_url} download className="w-full flex items-center justify-center space-x-2 bg-red-50 hover:bg-red-100 text-red-600 py-2.5 rounded-lg text-sm font-semibold transition-colors border border-red-200">
-                <Download size={16} /> <span>Download PDF</span>
-              </a>
-              <a href={document.docx_url} download className="w-full flex items-center justify-center space-x-2 bg-black hover:bg-gray-800 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors border border-black">
-                <Download size={16} /> <span>Download DOCX</span>
-              </a>
+              {document.pdf_url && (
+                <a href={getDownloadUrl(document.pdf_url, document.pdf_filename)} download className="w-full flex items-center justify-center space-x-2 bg-red-50 hover:bg-red-100 text-red-600 py-2.5 rounded-lg text-sm font-semibold transition-colors border border-red-200">
+                  <Download size={16} /> <span>Download PDF</span>
+                </a>
+              )}
+              {document.docx_url && (
+                <a href={getDownloadUrl(document.docx_url, document.docx_filename)} download className="w-full flex items-center justify-center space-x-2 bg-black hover:bg-gray-800 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors border border-black">
+                  <Download size={16} /> <span>Download DOCX</span>
+                </a>
+              )}
               <div className="flex space-x-3 pt-2">
                 <button onClick={() => setEditModalOpen(true)} className="flex-1 flex items-center justify-center space-x-2 bg-white hover:bg-gray-50 text-slate-700 py-2.5 rounded-lg text-sm font-semibold transition-colors border border-gray-300">
                   <Edit size={16} /> <span>Edit</span>
@@ -129,13 +139,50 @@ export default function DocumentDetails() {
 
           {/* Preview Section */}
           <div className="w-full md:w-2/3 flex flex-col h-[800px] md:h-auto">
-            <div className="bg-white border-b border-gray-200 p-4">
+            <div className="bg-white border-b border-gray-200 p-4 flex justify-between items-center">
               <h3 className="font-semibold text-black flex items-center gap-2">
-                <FileIcon size={18} className="text-black" /> DOCX Preview
+                {previewType === 'pdf' ? <FileText size={18} className="text-black" /> : <FileIcon size={18} className="text-black" />}
+                {previewType === 'pdf' ? 'PDF Preview' : 'DOCX Preview'}
               </h3>
+              <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
+                <button
+                  onClick={() => setPreviewType('pdf')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${previewType === 'pdf' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}
+                >
+                  PDF
+                </button>
+                <button
+                  onClick={() => setPreviewType('docx')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${previewType === 'docx' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}
+                >
+                  DOCX
+                </button>
+              </div>
             </div>
-            <div className="flex-1 p-6 bg-[#f0f2f5] overflow-hidden">
-              <DOCXViewer url={document.docx_url} />
+            <div className="flex-1 p-6 bg-[#f0f2f5] overflow-hidden flex flex-col">
+              {previewType === 'pdf' ? (
+                <div className="w-full h-full flex-1 rounded-lg overflow-hidden border border-gray-200 bg-white">
+                  {document.pdf_url ? (
+                    <iframe 
+                      src={`${document.pdf_url}#toolbar=0`} 
+                      className="w-full h-full rounded-b-xl border-none bg-slate-100"
+                      title={document.title}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-500">
+                      No PDF available
+                    </div>
+                  )}
+                </div>
+              ) : (
+                document.docx_url ? (
+                  <DOCXViewer url={document.docx_url} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-500">
+                    No DOCX available
+                  </div>
+                )
+              )}
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import Header from '@/components/Header';
+// import Header from '@/components/Header';
 import UploadDocument from '@/components/UploadDocument';
 import DocumentLibrary from '@/components/DocumentLibrary';
 

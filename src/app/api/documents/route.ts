@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { generateReferenceNumber } from '@/lib/reference';
-import { uploadToCloudinary } from '@/lib/cloudinaryUpload';
-import { deleteFromCloudinary } from '@/lib/cloudinaryDelete';
+import { uploadToSupabase } from '@/lib/supabaseUpload';
+import { deleteFromSupabase } from '@/lib/supabaseDelete';
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,11 +20,10 @@ export async function GET(req: NextRequest) {
         title LIKE ? OR 
         description LIKE ? OR 
         signatory LIKE ? OR 
-        recipient LIKE ? OR 
         tags LIKE ?
       )`;
       const searchWildcard = `%${search}%`;
-      params.push(searchWildcard, searchWildcard, searchWildcard, searchWildcard, searchWildcard, searchWildcard);
+      params.push(searchWildcard, searchWildcard, searchWildcard, searchWildcard, searchWildcard);
     }
 
     if (organization && organization !== 'All') {
@@ -53,6 +52,40 @@ export async function POST(req: NextRequest) {
   let docxResult: { url: string, public_id: string } | null = null;
 
   try {
+    const contentType = req.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await req.json();
+      
+      const {
+        referenceNumber, organization, title, description,
+        signatory, issuedDate, tags,
+        pdfFilename, pdfUrl, pdfPublicId,
+        docxFilename, docxUrl, docxPublicId
+      } = data;
+
+      if (!referenceNumber || !organization || !title || !issuedDate || !pdfUrl || !docxUrl) {
+        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      }
+
+      const query = `
+        INSERT INTO imp_doc (
+          reference_number, organization, title, description,
+          signatory, issued_date, tags,
+          pdf_filename, pdf_url, pdf_public_id,
+          docx_filename, docx_url, docx_public_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      const params = [
+        referenceNumber, organization, title, description || '',
+        signatory || '', issuedDate, tags || '',
+        pdfFilename, pdfUrl, pdfPublicId,
+        docxFilename, docxUrl, docxPublicId
+      ];
+
+      await pool.query(query, params);
+      return NextResponse.json({ success: true, referenceNumber }, { status: 201 });
+    }
+
     const formData = await req.formData();
     const organization = formData.get('organization') as string;
     const title = formData.get('title') as string;
@@ -85,40 +118,40 @@ export async function POST(req: NextRequest) {
     const referenceNumber = await generateReferenceNumber(orgCode, year);
 
     const baseFilename = referenceNumber;
-    const pdfFilename = `${baseFilename}__0001.pdf`;
-    const docxFilename = `${baseFilename}__0001.docx`;
+    const pdfFilename = `${baseFilename}__001.pdf`;
+    const docxFilename = `${baseFilename}__001.docx`;
 
     // Folder structure: document-management/<org>/<year>/<reference>
     const orgFolder = organization.toLowerCase();
-    const cloudinaryFolder = `document-management/${orgFolder}/${year}/${referenceNumber}`;
+    const storageFolder = `document-management/${orgFolder}/${year}/${referenceNumber}`;
 
     // Convert File to Buffer
     const pdfBuffer = Buffer.from(await pdfFile.arrayBuffer());
     const docxBuffer = Buffer.from(await docxFile.arrayBuffer());
 
-    // Upload to Cloudinary
-    pdfResult = await uploadToCloudinary(pdfBuffer, cloudinaryFolder, pdfFilename, pdfFile.type);
+    // Upload to Supabase
+    pdfResult = await uploadToSupabase(pdfBuffer, storageFolder, pdfFilename, pdfFile.type);
     
     try {
-      docxResult = await uploadToCloudinary(docxBuffer, cloudinaryFolder, docxFilename, docxFile.type);
+      docxResult = await uploadToSupabase(docxBuffer, storageFolder, docxFilename, docxFile.type);
     } catch (docxErr) {
       // If DOCX fails, clean up PDF
-      if (pdfResult) await deleteFromCloudinary(pdfResult.public_id, 'image');
+      if (pdfResult) await deleteFromSupabase(pdfResult.public_id);
       throw docxErr;
     }
 
     // Save to DB
     const query = `
       INSERT INTO imp_doc (
-        reference_number, organization, category, title, description,
-        signatory, recipient, issued_date, tags,
+        reference_number, organization, title, description,
+        signatory, issued_date, tags,
         pdf_filename, pdf_url, pdf_public_id,
         docx_filename, docx_url, docx_public_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const params = [
-      referenceNumber, organization, 'NONE', title, description,
-      signatory, '', issuedDate, tags,
+      referenceNumber, organization, title, description,
+      signatory, issuedDate, tags,
       pdfFilename, pdfResult.url, pdfResult.public_id,
       docxFilename, docxResult.url, docxResult.public_id
     ];
@@ -126,9 +159,9 @@ export async function POST(req: NextRequest) {
     try {
       await pool.query(query, params);
     } catch (dbErr) {
-      // If DB fails, clean up both Cloudinary files
-      if (pdfResult) await deleteFromCloudinary(pdfResult.public_id, 'image');
-      if (docxResult) await deleteFromCloudinary(docxResult.public_id, 'raw');
+      // If DB fails, clean up both Supabase files
+      if (pdfResult) await deleteFromSupabase(pdfResult.public_id);
+      if (docxResult) await deleteFromSupabase(docxResult.public_id);
       throw dbErr;
     }
 

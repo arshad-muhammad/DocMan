@@ -37,7 +37,7 @@ export async function generateReferenceNumber(
 
     await connection.commit();
 
-    const sequenceStr = nextSequence.toString().padStart(4, '0');
+    const sequenceStr = nextSequence.toString().padStart(3, '0');
     return `${prefix}-${sequenceStr}`;
   } catch (error) {
     await connection.rollback();

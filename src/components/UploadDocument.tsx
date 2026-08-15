@@ -69,6 +69,8 @@ export default function UploadDocument({ onSuccess }: UploadDocumentProps) {
     else setDocxFile(file);
   };
 
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -89,24 +91,14 @@ export default function UploadDocument({ onSuccess }: UploadDocumentProps) {
       formData.append('pdf', pdfFile);
       formData.append('docx', docxFile);
 
-      const res = await fetch('/api/documents', {
+      // Save to DB and Upload to Supabase via our Next.js API
+      const dbRes = await fetch('/api/documents', {
         method: 'POST',
         body: formData,
       });
 
-      let data;
-      const contentType = res.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        if (!res.ok) {
-          throw new Error(`Server error: ${res.status} ${res.statusText}. ${text.substring(0, 100)}`);
-        }
-        data = {};
-      }
-
-      if (!res.ok) throw new Error(data.error || 'Failed to upload document');
+      const data = await dbRes.json();
+      if (!dbRes.ok) throw new Error(data.error || 'Failed to save document record');
 
       setSuccessData({ referenceNumber: data.referenceNumber });
     } catch (err: any) {
