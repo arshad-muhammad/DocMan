@@ -24,6 +24,36 @@ export default function EditDocumentModal({ document, onClose, onSuccess }: Edit
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const docxInputRef = useRef<HTMLInputElement>(null);
 
+  const uploadToCloudinaryDirect = async (file: File, folder: string, filename: string, resourceType: 'image' | 'raw') => {
+    const timestamp = Math.round(new Date().getTime() / 1000);
+    const publicId = resourceType === 'raw' ? filename : filename.replace(/\.[^/.]+$/, "");
+
+    const signRes = await fetch('/api/cloudinary/sign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paramsToSign: { timestamp, folder, public_id: publicId } }),
+    });
+    
+    if (!signRes.ok) throw new Error('Failed to get upload signature');
+    const { signature, apiKey, cloudName } = await signRes.json();
+
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+    uploadData.append('api_key', apiKey);
+    uploadData.append('timestamp', timestamp.toString());
+    uploadData.append('signature', signature);
+    uploadData.append('folder', folder);
+    uploadData.append('public_id', publicId);
+
+    const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
+      method: 'POST',
+      body: uploadData,
+    });
+
+    if (!uploadRes.ok) throw new Error(`Failed to upload ${file.name} to Cloudinary`);
+    return await uploadRes.json();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (title.length < 3) return setError('Title must be at least 3 characters.');
@@ -43,19 +73,38 @@ export default function EditDocumentModal({ document, onClose, onSuccess }: Edit
     setError('');
 
     try {
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('description', description);
-      formData.append('signatory', signatory);
-      formData.append('issuedDate', issuedDate);
-      formData.append('tags', tags);
+      let pdfUrl, pdfPublicId, docxUrl, docxPublicId;
       
-      if (pdfFile) formData.append('pdf', pdfFile);
-      if (docxFile) formData.append('docx', docxFile);
+      if (pdfFile && docxFile) {
+        const year = new Date(document.issued_date).getFullYear().toString();
+        const orgFolder = document.organization.toLowerCase();
+        const cloudinaryFolder = `document-management/${orgFolder}/${year}/${document.reference_number}`;
+        
+        const newPdfVersion = (document.pdf_version || 1) + 1;
+        const newDocxVersion = (document.docx_version || 1) + 1;
+        
+        const basePdfName = document.pdf_filename.replace(/(__\d+)?\.pdf$/i, '');
+        const baseDocxName = document.docx_filename.replace(/(__\d+)?\.docx$/i, '');
+        
+        const newPdfFilename = `${basePdfName}__${newPdfVersion.toString().padStart(4, '0')}.pdf`;
+        const newDocxFilename = `${baseDocxName}__${newDocxVersion.toString().padStart(4, '0')}.docx`;
+
+        const pdfUpload = await uploadToCloudinaryDirect(pdfFile, cloudinaryFolder, newPdfFilename, 'image');
+        const docxUpload = await uploadToCloudinaryDirect(docxFile, cloudinaryFolder, newDocxFilename, 'raw');
+        
+        pdfUrl = pdfUpload.secure_url;
+        pdfPublicId = pdfUpload.public_id;
+        docxUrl = docxUpload.secure_url;
+        docxPublicId = docxUpload.public_id;
+      }
 
       const res = await fetch(`/api/documents/${document.reference_number}`, {
         method: 'PUT',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title, description, signatory, issuedDate, tags,
+          pdfUrl, pdfPublicId, docxUrl, docxPublicId
+        }),
       });
 
       let data;

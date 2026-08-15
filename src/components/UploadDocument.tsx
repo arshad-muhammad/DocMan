@@ -69,6 +69,36 @@ export default function UploadDocument({ onSuccess }: UploadDocumentProps) {
     else setDocxFile(file);
   };
 
+  const uploadToCloudinaryDirect = async (file: File, folder: string, filename: string, resourceType: 'image' | 'raw') => {
+    const timestamp = Math.round(new Date().getTime() / 1000);
+    const publicId = resourceType === 'raw' ? filename : filename.replace(/\.[^/.]+$/, "");
+
+    const signRes = await fetch('/api/cloudinary/sign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paramsToSign: { timestamp, folder, public_id: publicId } }),
+    });
+    
+    if (!signRes.ok) throw new Error('Failed to get upload signature');
+    const { signature, apiKey, cloudName } = await signRes.json();
+
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+    uploadData.append('api_key', apiKey);
+    uploadData.append('timestamp', timestamp.toString());
+    uploadData.append('signature', signature);
+    uploadData.append('folder', folder);
+    uploadData.append('public_id', publicId);
+
+    const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
+      method: 'POST',
+      body: uploadData,
+    });
+
+    if (!uploadRes.ok) throw new Error(`Failed to upload ${file.name} to Cloudinary`);
+    return await uploadRes.json();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -79,36 +109,42 @@ export default function UploadDocument({ onSuccess }: UploadDocumentProps) {
 
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('organization', organization);
-      formData.append('title', title);
-      formData.append('description', description);
-      formData.append('signatory', signatory);
-      formData.append('issuedDate', issuedDate);
-      formData.append('tags', tags);
-      formData.append('pdf', pdfFile);
-      formData.append('docx', docxFile);
-
-      const res = await fetch('/api/documents', {
+      // 1. Generate reference number
+      const refRes = await fetch('/api/documents/generate-ref', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organization, issuedDate }),
+      });
+      if (!refRes.ok) throw new Error('Failed to generate reference number');
+      const { referenceNumber } = await refRes.json();
+
+      const year = new Date(issuedDate).getFullYear().toString();
+      const orgFolder = organization.toLowerCase();
+      const cloudinaryFolder = `document-management/${orgFolder}/${year}/${referenceNumber}`;
+      
+      const pdfFilename = `${referenceNumber}__0001.pdf`;
+      const docxFilename = `${referenceNumber}__0001.docx`;
+
+      // 2. Upload to Cloudinary
+      const pdfUpload = await uploadToCloudinaryDirect(pdfFile, cloudinaryFolder, pdfFilename, 'image');
+      const docxUpload = await uploadToCloudinaryDirect(docxFile, cloudinaryFolder, docxFilename, 'raw');
+
+      // 3. Save to DB
+      const dbRes = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          referenceNumber, organization, title, description,
+          signatory, issuedDate, tags,
+          pdfFilename, pdfUrl: pdfUpload.secure_url, pdfPublicId: pdfUpload.public_id,
+          docxFilename, docxUrl: docxUpload.secure_url, docxPublicId: docxUpload.public_id
+        }),
       });
 
-      let data;
-      const contentType = res.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        if (!res.ok) {
-          throw new Error(`Server error: ${res.status} ${res.statusText}. ${text.substring(0, 100)}`);
-        }
-        data = {};
-      }
+      const data = await dbRes.json();
+      if (!dbRes.ok) throw new Error(data.error || 'Failed to save document record');
 
-      if (!res.ok) throw new Error(data.error || 'Failed to upload document');
-
-      setSuccessData({ referenceNumber: data.referenceNumber });
+      setSuccessData({ referenceNumber });
     } catch (err: any) {
       setError(err.message || 'Failed to upload document');
     } finally {
