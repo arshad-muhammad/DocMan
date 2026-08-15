@@ -45,34 +45,60 @@ export default function EditDocumentModal({ document, onClose, onSuccess }: Edit
     setError('');
 
     try {
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('description', description);
-      formData.append('signatory', signatory);
-      formData.append('issuedDate', issuedDate);
-      formData.append('tags', tags);
-      
+      let initData = null;
       if (pdfFile && docxFile) {
-        formData.append('pdf', pdfFile);
-        formData.append('docx', docxFile);
+        // Step 1: Initialize upload and get signed URLs
+        const initRes = await fetch(`/api/documents/${document.reference_number}/init-upload`, {
+          method: 'POST'
+        });
+        if (!initRes.ok) {
+          const err = await initRes.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to initialize upload");
+        }
+        initData = await initRes.json();
+
+        // Step 2: Upload files directly to Supabase via presigned URLs
+        const uploadFile = async (file: File, signedUrl: string, token: string) => {
+          let uploadUrl = signedUrl;
+          if (uploadUrl.startsWith('/')) {
+            uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1${uploadUrl}`;
+          }
+          const headers: any = { 'Content-Type': file.type };
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+
+          const res = await fetch(uploadUrl, { method: 'PUT', body: file, headers });
+          if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Failed to upload ${file.name} directly. ${res.statusText}`);
+          }
+        };
+
+        await uploadFile(pdfFile, initData.pdfSignedUrl, initData.pdfToken);
+        await uploadFile(docxFile, initData.docxSignedUrl, initData.docxToken);
+      }
+
+      // Step 3: Save metadata to our Next.js API
+      const payload: any = {
+        title,
+        description,
+        signatory,
+        issuedDate,
+        tags
+      };
+      if (initData) {
+        payload.pdfUrl = initData.pdfUrl;
+        payload.pdfPublicId = initData.pdfPublicId;
+        payload.docxUrl = initData.docxUrl;
+        payload.docxPublicId = initData.docxPublicId;
       }
 
       const res = await fetch(`/api/documents/${document.reference_number}`, {
         method: 'PUT',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
-      let data;
-      const contentType = res.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        if (!res.ok) {
-          throw new Error(`Server error: ${res.status} ${res.statusText}. ${text.substring(0, 100)}`);
-        }
-        data = {};
-      }
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) throw new Error(data.error || 'Failed to update document');
 

@@ -81,30 +81,63 @@ export default function UploadDocument({ onSuccess }: UploadDocumentProps) {
 
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('organization', organization);
-      formData.append('title', title);
-      formData.append('description', description);
-      formData.append('signatory', signatory);
-      formData.append('issuedDate', issuedDate);
-      formData.append('tags', tags);
-      formData.append('pdf', pdfFile);
-      formData.append('docx', docxFile);
+      // Step 1: Initialize upload and get signed URLs
+      const initRes = await fetch('/api/documents/init-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organization, issuedDate })
+      });
+      if (!initRes.ok) {
+        const err = await initRes.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to initialize upload");
+      }
+      const initData = await initRes.json();
 
-      // Save to DB and Upload to Supabase via our Next.js API
+      // Step 2: Upload files directly to Supabase via presigned URLs
+      const uploadFile = async (file: File, signedUrl: string, token: string) => {
+        let uploadUrl = signedUrl;
+        // In case Supabase returns a relative URL
+        if (uploadUrl.startsWith('/')) {
+          uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1${uploadUrl}`;
+        }
+        
+        const headers: any = {
+           'Content-Type': file.type,
+        };
+        if (token) {
+           headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch(uploadUrl, { method: 'PUT', body: file, headers });
+        if (!res.ok) {
+           const errText = await res.text();
+           throw new Error(`Failed to upload ${file.name} directly to storage. ${res.statusText}`);
+        }
+      };
+
+      await uploadFile(pdfFile, initData.pdfSignedUrl, initData.pdfToken);
+      await uploadFile(docxFile, initData.docxSignedUrl, initData.docxToken);
+
+      // Step 3: Save metadata to our Next.js API
       const dbRes = await fetch('/api/documents', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          referenceNumber: initData.referenceNumber,
+          organization,
+          title,
+          description,
+          signatory,
+          issuedDate,
+          tags,
+          pdfFilename: initData.pdfFilename,
+          pdfUrl: initData.pdfUrl,
+          pdfPublicId: initData.pdfPublicId,
+          docxFilename: initData.docxFilename,
+          docxUrl: initData.docxUrl,
+          docxPublicId: initData.docxPublicId
+        })
       });
-
-      const contentType = dbRes.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const textError = await dbRes.text();
-        if (dbRes.status === 413) {
-          throw new Error("File is too large. Maximum upload size exceeded.");
-        }
-        throw new Error(textError || 'Server error: Invalid response format');
-      }
 
       const data = await dbRes.json();
       if (!dbRes.ok) throw new Error(data.error || 'Failed to save document record');
